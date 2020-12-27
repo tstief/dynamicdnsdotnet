@@ -123,7 +123,9 @@ namespace dynamicdnsdotnet
             }
             catch(Exception ex)
             {
-                Console.WriteLine($"Exception: {ex.Message}");
+                var exceptionMessage = $"Exception: {ex.Message}";
+                Console.WriteLine(exceptionMessage);
+                SendSimpleMessage(exceptionMessage);
             }
         }
 

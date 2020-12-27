@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "dynamicdnsdotnet": {
+      "commandName": "Project",
+      "commandLineArgs": "$(ProjectDir)$(OutDir)"
+    }
+  }
+}

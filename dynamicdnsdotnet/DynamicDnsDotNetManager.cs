@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using RestSharp;
 using RestSharp.Authenticators;
+using System.Collections.Generic;
 
 namespace dynamicdnsdotnet
 {
@@ -27,7 +28,7 @@ namespace dynamicdnsdotnet
         {
             Started = false;
             Console.WriteLine("Starting Dynamic DNS");
-            SendSimpleMessage("Starting Dynamic DNS");
+            SendSimpleMessage("Dynamic DNS Info", "The Dynamic DNS Process is has started.");
             CheckIpAddress();
             Timer.Start();
             Started = true;
@@ -49,7 +50,9 @@ namespace dynamicdnsdotnet
             }
             else
             {
-                Console.WriteLine($"Unable to obtain current external IP address from provider: {response.ErrorMessage}");
+                var message = $"Unable to obtain current external IP address from provider: {response.ErrorMessage}";
+                Console.WriteLine(message);
+                SendSimpleMessage($"Dynamic DNS IP Address Retrieval Error", message);
             }
 
             return ip;
@@ -76,7 +79,7 @@ namespace dynamicdnsdotnet
             return string.Empty;
         }
 
-        private void UpdateHost(string ipAddress, Host host)
+        private string UpdateHost(string ipAddress, Host host)
         {
             var client = new RestClient();
             client.BaseUrl = new Uri($"https://domains.google.com/nic/update?hostname={host.Name}&myip={ipAddress}");
@@ -84,20 +87,13 @@ namespace dynamicdnsdotnet
                 new HttpBasicAuthenticator(host.Username, host.Password);
             var request = new RestRequest();
             request.Method = Method.POST;
-            var response = client.Execute(request);
 
-            string logMessage;
+            var response = client.Execute(request);
             if(response.IsSuccessful)
             {
-                logMessage = $"Updating host={host.Name}, ip={ipAddress}, server response={response.Content}";
+                return $"Updating host={host.Name}, ip={ipAddress}, server response={response.Content}";
             }
-            else
-            {
-                logMessage = $"Error updating host={host.Name}, ip={ipAddress}, error message={response.ErrorMessage}";
-            }
-            
-            Console.WriteLine(logMessage);
-            SendSimpleMessage(logMessage);
+            return $"Error updating host={host.Name}, ip={ipAddress}, error message={response.ErrorMessage}";            
         }
 
         private void CheckIpAddress()
@@ -114,10 +110,18 @@ namespace dynamicdnsdotnet
 
                 if(currentIpFromFile != ipFromProvider)
                 {
+                    List<string> logMessages = new List<string>();
                     foreach(var host in Configuration.Hosts)
                     {
-                        UpdateHost(ipFromProvider, host);
+                        string logMessage = UpdateHost(ipFromProvider, host);
+                        Console.WriteLine(logMessage);
+                        logMessages.Add(logMessage);
                     }
+
+                    var emailBody = string.Empty;
+                    logMessages.ForEach(message => emailBody += '\n' + message);
+                    SendSimpleMessage("Dynamic DNS Updating Hosts", emailBody);
+
                     WriteCurrentIPToFile(ipFromProvider);
                 }
             }
@@ -125,11 +129,11 @@ namespace dynamicdnsdotnet
             {
                 var exceptionMessage = $"Exception: {ex.Message}";
                 Console.WriteLine(exceptionMessage);
-                SendSimpleMessage(exceptionMessage);
+                SendSimpleMessage("Dynamic DNS Exception", exceptionMessage);
             }
         }
 
-        public IRestResponse SendSimpleMessage(string message)
+        public IRestResponse SendSimpleMessage(string subject, string message)
         {
             if (Configuration.EnableEmail)
             {
@@ -143,10 +147,15 @@ namespace dynamicdnsdotnet
                 request.Resource = "{domain}/messages";
                 request.AddParameter("from", $"noreply@{Configuration.MailDomain}");
                 Configuration.EmailAddresses.ForEach(address => request.AddParameter("to", address));
-                request.AddParameter("subject", "Dynamic DNS Dot Net Message");
+                request.AddParameter("subject", subject);
                 request.AddParameter("text", message);
                 request.Method = Method.POST;
-                return client.Execute(request);
+                var response = client.Execute(request);
+                if(!response.IsSuccessful)
+                {
+                    Console.WriteLine($"Error sending email: {response.ErrorMessage}");
+                }
+                return response;
             }
             return null;
         }

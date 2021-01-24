@@ -13,5 +13,6 @@ namespace dynamicdnsdotnet
         public string MailApiKey { get; set; }
         public string MailDomain { get; set; }
         public string MailProviderUri { get; set; }
+        public int WebRequestTimeOut { get; set; }
     }
 }

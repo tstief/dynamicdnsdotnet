@@ -35,11 +35,17 @@ namespace dynamicdnsdotnet
             while (true){ Thread.Sleep(1000); }
         }
 
+        private int TimeOut
+        {
+            get { return Configuration.WebRequestTimeOut * 1000; }
+        }
+
         private string GetCurrentIPFromProvider()
         {
             var ip = string.Empty;           
             
             var client = new RestClient();
+            client.Timeout = TimeOut;
             client.BaseUrl = new Uri(Configuration.IPProviderURL);
             var request = new RestRequest();
             request.Method = Method.GET;
@@ -82,6 +88,7 @@ namespace dynamicdnsdotnet
         private string UpdateHost(string ipAddress, Host host)
         {
             var client = new RestClient();
+            client.Timeout = TimeOut;
             client.BaseUrl = new Uri($"https://domains.google.com/nic/update?hostname={host.Name}&myip={ipAddress}");
             client.Authenticator =
                 new HttpBasicAuthenticator(host.Username, host.Password);
